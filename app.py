@@ -1,10 +1,12 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
 import pandas as pd
 import pickle
 from sklearn import preprocessing
 
 
 app = Flask(__name__)
+CORS(app)
 
 model = pickle.load(open("linear_regression_model.pkl", "rb"))
 data_scaler = preprocessing.MinMaxScaler(feature_range=(0, 1))
@@ -30,6 +32,33 @@ def prediction():
             df_prediction[['RM', 'LSTAT', 'PTRATIO']])
         result = model.predict(df_prediction)
         return render_template("prediction.html", medv=result, rm=rm, lstat=lstat, ptratio=ptratio)
+
+
+@app.route("/api/prediction", methods=["POST"])
+def prediction_api():
+    if request.method == "POST":
+        input_data = request.get_json()
+        rm = input_data["rm"]
+        lstat = input_data["lstat"]
+        ptratio = input_data["ptratio"]
+        df_prediction = pd.DataFrame({
+            "RM": [rm],
+            "LSTAT": [lstat],
+            "PTRATIO": [ptratio],
+        })
+        df_prediction[['RM', 'LSTAT', 'PTRATIO']] = data_scaler.fit_transform(
+            df_prediction[['RM', 'LSTAT', 'PTRATIO']])
+        result = model.predict(df_prediction)
+        result = result.tolist()
+        return jsonify({
+            "status": {
+                "code": 200,
+                "message": "Success predicting",
+            },
+            "data": {
+                "medv_result": result
+            }
+        })
 
 
 if __name__ == "__main__":
